@@ -49,13 +49,23 @@ export function confirmDialog({ title, body, confirmLabel = 'Confirm', danger = 
     </dialog>`);
     document.body.appendChild(dlg);
 
-    let answered = false;
-    const finish = (v) => { answered = true; dlg.close(); resolve(v); };
+    // Settle + remove directly — never lean on the dialog 'close'
+    // event, which at least one embedded Chromium never fires.
+    // Leaning on it left orphaned dialogs stacked in the DOM.
+    let settled = false;
+    const finish = (v) => {
+      if (settled) return;
+      settled = true;
+      try { dlg.close(); } catch { /* already closed */ }
+      dlg.remove();
+      resolve(v);
+    };
 
     $('[data-yes]', dlg).addEventListener('click', () => finish(true));
     $('[data-no]', dlg).addEventListener('click', () => finish(false));
     dlg.addEventListener('click', (e) => { if (e.target === dlg) finish(false); });
-    dlg.addEventListener('close', () => { dlg.remove(); if (!answered) resolve(false); });
+    dlg.addEventListener('cancel', (e) => { e.preventDefault(); finish(false); });
+    dlg.addEventListener('close', () => finish(false));
 
     dlg.showModal();
     $('[data-yes]', dlg).focus();

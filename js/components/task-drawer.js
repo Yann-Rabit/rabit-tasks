@@ -23,6 +23,7 @@ let dlg = null;
 let currentId = null;
 let ctx = null;          // { store, onChange, returnFocus }
 let closing = false;
+let finalized = true;    // teardown ran for the current open-cycle
 
 export const openTaskId = () => currentId;
 
@@ -36,6 +37,11 @@ export function closeDrawer() {
     closing = false;
     dlg.classList.remove('is-closing');
     dlg.close();
+    // Do not rely on the dialog 'close' event for teardown — at least
+    // one embedded Chromium build never fires it. finalize() is
+    // idempotent, and the event listener below is just a backup for
+    // closes we did not initiate.
+    finalize();
   };
   dlg.addEventListener('animationend', (e) => { if (e.target === dlg) done(); }, { once: true });
   setTimeout(done, 220);
@@ -44,6 +50,7 @@ export function closeDrawer() {
 export function openDrawer(taskId, options = {}) {
   ctx = options;
   currentId = taskId;
+  finalized = false;
   ensure();
   render();
   if (!dlg.open) dlg.showModal();
@@ -62,6 +69,52 @@ export function refreshDrawer() {
   if (active && dlg.contains(active) &&
       (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return;
   render();
+}
+
+/**
+ * Teardown for one open-cycle: flush pending text, discard the task
+ * if it is still completely empty, release ctx. Idempotent — called
+ * from done() and from the dialog 'close' event, whichever runs.
+ */
+function finalize() {
+  if (finalized) return;
+  finalized = true;
+  closing = false;
+
+  const store = ctx?.store;
+  const id = currentId;
+
+  if (store && id) {
+    const t = store.state.tasks.find((x) => x.id === id);
+    if (t) {
+      // Flush what is sitting in the fields right now — the debounced
+      // savers wait 350ms, and a fast close must never eat a title.
+      const domTitle = $('.dr__title', dlg)?.value.trim();
+      const domDesc = $('[data-d="description"]', dlg)?.value.trim();
+      const patch = {};
+      if (domTitle !== undefined && domTitle !== t.title) patch.title = domTitle;
+      if (domDesc !== undefined && domDesc !== t.description) patch.description = domDesc;
+      if (Object.keys(patch).length) store.updateTask(id, patch);
+
+      // A task that is still completely empty when the drawer closes
+      // was never really created — discard it, no ghost rows.
+      const fresh = store.state.tasks.find((x) => x.id === id);
+      const empty = fresh
+        && !fresh.title.trim()
+        && !fresh.description.trim()
+        && !(fresh.subtasks || []).some((s) => s.title.trim())
+        && !(fresh.comments || []).length;
+      if (empty) {
+        store.removeTask(id);
+        toast('Empty task discarded.');
+      }
+      ctx?.onChange?.();
+    }
+  }
+
+  currentId = null;
+  ctx?.returnFocus?.();
+  ctx = null;
 }
 
 /* ------------------------------------------------------------ */
@@ -104,12 +157,7 @@ function ensure() {
   dlg.setAttribute('aria-label', 'Task details');
   document.body.appendChild(dlg);
 
-  dlg.addEventListener('close', () => {
-    closing = false;
-    currentId = null;
-    ctx?.returnFocus?.();
-    ctx = null;
-  });
+  dlg.addEventListener('close', finalize);
   dlg.addEventListener('click', (e) => { if (e.target === dlg) closeDrawer(); });
   dlg.addEventListener('cancel', (e) => { e.preventDefault(); closeDrawer(); });
 

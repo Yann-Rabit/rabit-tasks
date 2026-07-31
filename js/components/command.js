@@ -132,6 +132,7 @@ export function openCommand(cfg) {
   ensure();
   onCreate = cfg.create;
   commands = build(cfg);
+  $('#cmd-input', dlg).value = '';
   refresh('');
   if (!dlg.open) dlg.showModal();
   $('#cmd-input', dlg).focus();
@@ -200,7 +201,9 @@ export function shortcutsDialog() {
     </div>
   </dialog>`);
   document.body.appendChild(d);
+  const dismiss = () => { try { d.close(); } catch { /* closed */ } d.remove(); };
   d.addEventListener('close', () => d.remove());
-  d.addEventListener('click', (e) => { if (e.target === d || e.target.closest('[data-close]')) d.close(); });
+  d.addEventListener('cancel', (e) => { e.preventDefault(); dismiss(); });
+  d.addEventListener('click', (e) => { if (e.target === d || e.target.closest('[data-close]')) dismiss(); });
   d.showModal();
 }
