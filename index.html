@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F7F8FA">
+<meta name="description" content="Rabit Tasks — the two of you, one backlog, one board.">
+<title>Rabit Tasks</title>
+
+<!--
+  DIRECTION CONTRACT
+
+  THESIS: A task manager for exactly two founders that answers "what should I
+  work on next" faster than it can be asked — Linear-clean product language,
+  built around a scannable backlog and a five-column board, with everything
+  else one keystroke away.
+
+  OWN-WORLD: Restrained neutral system (cool greys on #F7F8FA), one blue
+  accent (#3B82F6 — Rabit's own), Inter throughout, 1px borders and spacing
+  for hierarchy. Elevation exists only on menus, drawers, dragged cards and
+  toasts. Status and priority are always shape + word, never colour alone.
+
+  STORY: A founder opens the backlog, sees their day grouped by status with
+  overdue and blocked already surfaced, drags one card to In Progress, ⌘K's
+  a thought into a task, and closes the tab. Round trip under a minute.
+
+  FORM: Sidebar + topbar shell; Backlog (grouped list, quick-add, inline
+  edit, multi-select) as the default view; Board as its twin; My Tasks,
+  Inbox triage, Home, and a deliberately reduced Timeline as satellites.
+  The task detail is a right drawer that autosaves — never a centre modal.
+
+  FINISH: reviewed against impeccable's craft floor and Operate rules;
+  motion follows Emil's frequency framework (⌘K does not animate).
+-->
+
+<link rel="icon" href="assets/rabit-icon.png">
+<link rel="apple-touch-icon" href="assets/rabit-icon.png">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/app.css">
+</head>
+
+<body>
+
+<div id="root"></div>
+
+<noscript>
+  <div style="padding:48px;font-family:system-ui;max-width:480px">
+    <h1 style="font-size:20px">Rabit Tasks needs JavaScript.</h1>
+    <p style="color:#6B7178">It runs entirely in your browser — there is no server to fall back to.</p>
+  </div>
+</noscript>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

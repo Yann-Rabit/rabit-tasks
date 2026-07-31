@@ -1,0 +1,218 @@
+/* ============================================================
+   Design tokens — Rabit Tasks
+   ============================================================
+   One token file. The previous build carried the brand system
+   and an app layer that had begun to drift apart; a product this
+   size gets a single source of truth.
+
+   Provenance:
+   · Neutral ramp is the product palette specified for this
+     redesign. It is cooler and tighter than the brand's warm
+     marketing neutrals, which is correct for a dense Operate
+     surface read all day.
+   · Accent #3B82F6 is Rabit's one brand accent, and sits inside
+     the "indigo or electric blue" this redesign called for. No
+     second accent is introduced.
+   · Type is Inter throughout. Space Grotesk stays a marketing
+     face; product UI wants one well-tuned family (Operate rule),
+     and the brand's own guidance reserves display faces for
+     brand surfaces.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  color-scheme: light;
+
+  /* ---------- Type ---------- */
+  --font: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+
+  --fs-title:  20px;   /* page title */
+  --fs-h2:     15px;   /* section heading */
+  --fs-h3:     13px;
+  --fs-body:   14px;   /* task titles, prose */
+  --fs-ui:     13px;   /* buttons, controls, rows */
+  --fs-meta:   12px;   /* metadata */
+  --fs-micro:  11px;   /* counts, keycaps */
+
+  --lh-tight: 1.25;
+  --lh-ui:    1.45;
+  --lh-prose: 1.6;
+
+  /* ---------- Neutrals (light) ---------- */
+  --app-bg:      #F7F8FA;
+  --surface:     #FFFFFF;
+  --surface-2:   #F1F3F5;
+  --surface-3:   #E9ECEF;
+
+  --text:        #17191C;
+  --text-2:      #6B7178;
+  --text-3:      #9298A1;
+
+  --border:      #E3E6EA;
+  --border-2:    #D4D9DF;
+
+  /* ---------- Accent ---------- */
+  --accent:        #3B82F6;
+  --accent-hover:  #2F73E4;
+  --accent-soft:   rgba(59, 130, 246, 0.10);
+  --accent-ring:   rgba(59, 130, 246, 0.28);
+  --on-accent:     #FFFFFF;
+
+  /* ---------- Semantic tones ----------
+     Each is a triple: line / soft fill / text. Status and
+     priority never rely on hue alone — every use pairs these
+     with a glyph or a word. */
+  --t-neutral:      #8A9099;
+  --t-neutral-soft: #EFF1F3;
+  --t-neutral-text: #5B6169;
+
+  --t-blue:         #5B8DEF;
+  --t-blue-soft:    #EAF1FE;
+  --t-blue-text:    #2C63C4;
+
+  --t-indigo:       #5B5CE2;
+  --t-indigo-soft:  #EDEDFC;
+  --t-indigo-text:  #4344C4;
+
+  --t-red:          #DC5B5B;
+  --t-red-soft:     #FCECEC;
+  --t-red-text:     #B03D3D;
+
+  --t-orange:       #DE8038;
+  --t-orange-soft:  #FDF0E4;
+  --t-orange-text:  #A85C1C;
+
+  --t-amber:        #C9A227;
+  --t-amber-soft:   #FBF5E1;
+  --t-amber-text:   #8A6D10;
+
+  --t-green:        #45A06A;
+  --t-green-soft:   #E9F5EE;
+  --t-green-text:   #2F7A4E;
+
+  --t-slate:        #7B8794;
+  --t-slate-soft:   #EEF1F4;
+  --t-slate-text:   #566270;
+
+  /* ---------- Space (4px base) ---------- */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+  --s-5: 20px; --s-6: 24px; --s-8: 32px; --s-10: 40px;
+  --s-12: 48px; --s-16: 64px;
+
+  /* ---------- Radius ---------- */
+  --r-xs:   4px;
+  --r-sm:   6px;
+  --r-md:   8px;    /* inputs, buttons */
+  --r-lg:   10px;   /* cards */
+  --r-xl:   12px;   /* drawers, menus */
+  --r-full: 999px;
+
+  /* ---------- Elevation ----------
+     Reserved for menus, drawers, dragged cards, overlays. Nothing
+     in the page body floats. */
+  --sh-menu:   0 1px 2px rgba(16, 20, 26, 0.06), 0 8px 24px -6px rgba(16, 20, 26, 0.16);
+  --sh-drawer: -1px 0 0 var(--border), 0 12px 40px -8px rgba(16, 20, 26, 0.18);
+  --sh-drag:   0 2px 4px rgba(16, 20, 26, 0.08), 0 12px 28px -6px rgba(16, 20, 26, 0.22);
+  --sh-toast:  0 2px 6px rgba(16, 20, 26, 0.10), 0 16px 32px -8px rgba(16, 20, 26, 0.24);
+
+  /* ---------- Motion ----------
+     Emil's curves: the built-in CSS easings are too weak to read
+     as intentional. Durations sit at 120–180ms because the user
+     is mid-task and must never wait on choreography. */
+  --ease-out:    cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --d-fast: 120ms;
+  --d-base: 150ms;
+  --d-slow: 180ms;
+  --d-drawer: 260ms;
+
+  /* ---------- Layout ---------- */
+  --sidebar-w:      232px;
+  --sidebar-w-min:  56px;
+  --topbar-h:       52px;
+  --row-h:          40px;
+  --drawer-w:       460px;
+
+  --focus: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent-ring);
+
+  /* ---------- Project palette (charts only) ----------
+     Categorical, from the dataviz reference ramps. Light set
+     passes the six checks all-pairs (aqua's 2.8:1 surface
+     contrast is relieved by visible labels). Identity is always
+     carried by a text label first; these tints reinforce it. */
+  --p-product:    #2a78d6;
+  --p-fundraise:  #4a3aa7;
+  --p-commercial: #eb6834;
+  --p-ops:        #1baf7a;
+  --p-none:       #8A9099;
+}
+
+/* ============================================================
+   Dark — deep neutrals, never pure black.
+   ============================================================ */
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --app-bg:    #0F1113;
+  --surface:   #16181B;
+  --surface-2: #1C1F23;
+  --surface-3: #24282D;
+
+  --text:      #EDEFF2;
+  --text-2:    #9BA2AB;
+  --text-3:    #6E757E;
+
+  --border:    #24282D;
+  --border-2:  #31363C;
+
+  --accent:       #5B92F8;
+  --accent-hover: #71A2FA;
+  --accent-soft:  rgba(91, 146, 248, 0.14);
+  --accent-ring:  rgba(91, 146, 248, 0.34);
+  --on-accent:    #0F1113;
+
+  --t-neutral-soft: #232629;  --t-neutral-text: #A3AAB3;
+  --t-blue-soft:    #16243C;  --t-blue-text:    #8FB4F7;
+  --t-indigo-soft:  #1E1E3C;  --t-indigo-text:  #A0A1F0;
+  --t-red-soft:     #331A1A;  --t-red-text:     #F09B9B;
+  --t-orange-soft:  #33220F;  --t-orange-text:  #EFAE72;
+  --t-amber-soft:   #2E2814;  --t-amber-text:   #DCC163;
+  --t-green-soft:   #14291D;  --t-green-text:   #7DC79B;
+  --t-slate-soft:   #22262A;  --t-slate-text:   #A4AEB8;
+
+  --sh-menu:   0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -6px rgba(0, 0, 0, 0.6);
+  --sh-drawer: -1px 0 0 var(--border), 0 12px 40px -8px rgba(0, 0, 0, 0.6);
+  --sh-drag:   0 2px 4px rgba(0, 0, 0, 0.4), 0 12px 28px -6px rgba(0, 0, 0, 0.7);
+  --sh-toast:  0 2px 6px rgba(0, 0, 0, 0.5), 0 16px 32px -8px rgba(0, 0, 0, 0.7);
+
+  --focus: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent-ring);
+
+  /* Dark steps of the same hues. The violet↔blue pair sits below
+     the normal-vision floor on dark, which is acceptable here
+     only because identity is text-first (facet labels); the tint
+     never carries identity alone. */
+  --p-product:    #3987e5;
+  --p-fundraise:  #b184f2;
+  --p-commercial: #d95926;
+  --p-ops:        #199e70;
+  --p-none:       #6E757E;
+}
+
+/* ============================================================
+   Tone helper — one class per semantic tone, so a status pill
+   and a priority chip never hand-roll their own colours.
+   ============================================================ */
+
+[data-tone="neutral"] { --tone: var(--t-neutral); --tone-soft: var(--t-neutral-soft); --tone-text: var(--t-neutral-text); }
+[data-tone="blue"]    { --tone: var(--t-blue);    --tone-soft: var(--t-blue-soft);    --tone-text: var(--t-blue-text); }
+[data-tone="indigo"]  { --tone: var(--t-indigo);  --tone-soft: var(--t-indigo-soft);  --tone-text: var(--t-indigo-text); }
+[data-tone="red"]     { --tone: var(--t-red);     --tone-soft: var(--t-red-soft);     --tone-text: var(--t-red-text); }
+[data-tone="orange"]  { --tone: var(--t-orange);  --tone-soft: var(--t-orange-soft);  --tone-text: var(--t-orange-text); }
+[data-tone="amber"]   { --tone: var(--t-amber);   --tone-soft: var(--t-amber-soft);   --tone-text: var(--t-amber-text); }
+[data-tone="green"]   { --tone: var(--t-green);   --tone-soft: var(--t-green-soft);   --tone-text: var(--t-green-text); }
+[data-tone="slate"]   { --tone: var(--t-slate);   --tone-soft: var(--t-slate-soft);   --tone-text: var(--t-slate-text); }
