@@ -143,6 +143,12 @@ function preferencesBlocks(state) {
       </div>
 
       <div class="block">
+        <h2 class="block__title">About</h2>
+        <p class="field__hint">Build <span style="font-family:var(--font-mono)">${esc(String(globalThis.__RABIT_BUILD ?? 'dev'))}</span>
+        — the app updates itself when a new build ships.</p>
+      </div>
+
+      <div class="block">
         <h2 class="block__title">Reset</h2>
         <p class="block__desc">Deletes every task and member in this browser and reloads the seeded workspace.</p>
         <button class="btn btn--danger" data-act="reset">${icon('trash', 'i--sm')} Reset workspace</button>

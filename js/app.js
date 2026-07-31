@@ -19,7 +19,7 @@ import { slack } from './slack.js';
 import { shellBar, mobileNav } from './components/shell.js';
 import { quickAddRow } from './components/task-list.js';
 import { taskBoard } from './components/task-board.js';
-import { openDrawer, closeDrawer, refreshDrawer } from './components/task-drawer.js';
+import { openDrawer, closeDrawer, refreshDrawer, openTaskId } from './components/task-drawer.js';
 import { openCommand, shortcutsDialog } from './components/command.js';
 import { toast, confirmDialog } from './components/feedback.js';
 import { makeDraggable } from './components/dnd.js';
@@ -110,6 +110,15 @@ const root = $('#root');
     route(location.hash); render();
   });
   window.addEventListener('beforeunload', () => store.flush());
+
+  // A silent exception looks exactly like "the buttons stopped working".
+  // Surface it instead.
+  window.addEventListener('error', (e) => {
+    toast(`Something broke: ${e.message}. Reload if the app misbehaves.`, { tone: 'err', timeout: 12000 });
+  });
+  window.addEventListener('unhandledrejection', () => {
+    toast('A background task failed. Reload if the app misbehaves.', { tone: 'err', timeout: 9000 });
+  });
 
   render();
 })();
@@ -634,6 +643,15 @@ document.addEventListener('keydown', (e) => {
   const el = e.target instanceof Element ? e.target : null;
   const typing = !!el && (TYPING.has(el.tagName) || /** @type {HTMLElement} */ (el).isContentEditable);
   const inOverlay = !!el?.closest('dialog, .menu');
+
+  // Escape always reaches the drawer, regardless of focus, unless a
+  // menu or confirm dialog is on top (they close themselves first).
+  if (e.key === 'Escape' && openTaskId()
+      && !document.querySelector('.menu') && !document.querySelector('.dlg[open]')) {
+    e.preventDefault();
+    closeDrawer();
+    return;
+  }
 
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k' && !inOverlay) {
     e.preventDefault(); command(); return;

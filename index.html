@@ -50,6 +50,31 @@
   </div>
 </noscript>
 
+<script>
+/* Auto-update. GitHub Pages caches every file for ten minutes, which
+   once left a user clicking buttons in a build whose bugs were already
+   fixed. On each load: read version.json (never cached); if the build
+   changed, refetch every app file straight past the HTTP cache, then
+   reload once. Guarded so a bad version.json can never reload-loop. */
+(async () => {
+  try {
+    const res = await fetch('version.json?ts=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) return;
+    const v = await res.json();
+    globalThis.__RABIT_BUILD = v.build;
+    const seen = localStorage.getItem('rabit.build');
+    if (seen === v.build) return;
+    if (sessionStorage.getItem('rabit.updating') === v.build) {
+      localStorage.setItem('rabit.build', v.build);   // second pass: fresh already
+      return;
+    }
+    sessionStorage.setItem('rabit.updating', v.build);
+    await Promise.allSettled((v.files || []).map((f) => fetch(f, { cache: 'reload' })));
+    localStorage.setItem('rabit.build', v.build);
+    location.reload();
+  } catch { /* offline or first load — run what we have */ }
+})();
+</script>
 <script type="module" src="js/app.js"></script>
 </body>
 </html>

@@ -22,36 +22,38 @@ import { confirmDialog, toast } from './feedback.js';
 let dlg = null;
 let currentId = null;
 let ctx = null;          // { store, onChange, returnFocus }
-let closing = false;
 let finalized = true;    // teardown ran for the current open-cycle
 
 export const openTaskId = () => currentId;
 
+/**
+ * Close is SYNCHRONOUS and unconditional: teardown runs, then the
+ * dialog closes. No exit animation, no timers, no events, no flags —
+ * a close that can wait on nothing is a close that cannot wedge.
+ * (The exit animation was cut deliberately: closing happens dozens
+ * of times a day, and reliability beats 150ms of choreography.)
+ */
 export function closeDrawer() {
-  if (!dlg?.open || closing) return;
-  closing = true;
+  if (!dlg) return;
   closeMenu();
-  dlg.classList.add('is-closing');
-  const done = () => {
-    if (!closing) return;
-    closing = false;
-    dlg.classList.remove('is-closing');
-    dlg.close();
-    // Do not rely on the dialog 'close' event for teardown — at least
-    // one embedded Chromium build never fires it. finalize() is
-    // idempotent, and the event listener below is just a backup for
-    // closes we did not initiate.
-    finalize();
-  };
-  dlg.addEventListener('animationend', (e) => { if (e.target === dlg) done(); }, { once: true });
-  setTimeout(done, 220);
+  finalize();
+  if (dlg.open) { try { dlg.close(); } catch { /* already closed */ } }
 }
 
+// Last-resort path, wired inline onto the X button in the markup —
+// works even if every delegated listener has somehow died.
+globalThis.__rabitCloseDrawer = () => closeDrawer();
+
 export function openDrawer(taskId, options = {}) {
+  ensure();
+  // Opening while another task's cycle is still live (double-click on
+  // New task, click a row while a drawer is open): settle the previous
+  // cycle first, so its empty task is discarded, not orphaned.
+  if (!finalized) finalize();
+
   ctx = options;
   currentId = taskId;
   finalized = false;
-  ensure();
   render();
   if (!dlg.open) dlg.showModal();
   $('.dr__title', dlg)?.focus({ preventScroll: true });
@@ -79,7 +81,6 @@ export function refreshDrawer() {
 function finalize() {
   if (finalized) return;
   finalized = true;
-  closing = false;
 
   const store = ctx?.store;
   const id = currentId;
@@ -191,12 +192,15 @@ function ensure() {
 
 async function onAction(e) {
   const btn = e.target.closest('[data-d]');
-  if (!btn || !ctx) return;
+  if (!btn) return;
   const d = btn.dataset.d;
-  const cur = task();
-  if (!cur && d !== 'close') return;
 
+  // Close before ANY guard — it must work even if ctx is somehow gone.
   if (d === 'close') { closeDrawer(); return; }
+
+  if (!ctx) return;
+  const cur = task();
+  if (!cur) return;
 
   if (d === 'copy') {
     try {
@@ -288,7 +292,8 @@ function render() {
       <button class="btn btn--ghost btn--icon" data-d="copy" aria-label="Copy task ID">${icon('tag')}</button>
       <button class="btn btn--ghost btn--icon" data-d="archive" aria-label="${t.archived ? 'Unarchive' : 'Archive'} task">${icon('archive')}</button>
       <button class="btn btn--ghost btn--icon" data-d="delete" aria-label="Delete task">${icon('trash')}</button>
-      <button class="btn btn--ghost btn--icon" data-d="close" aria-label="Close (Escape)">${icon('x')}</button>
+      <button class="btn btn--ghost btn--icon" data-d="close" aria-label="Close (Escape)"
+              onclick="globalThis.__rabitCloseDrawer && globalThis.__rabitCloseDrawer()">${icon('x')}</button>
     </header>
 
     <div class="dr__body scroll">
