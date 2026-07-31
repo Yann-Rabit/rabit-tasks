@@ -97,7 +97,18 @@ const root = $('#root');
     toast(SYNC ? 'Board updated from the shared workspace.' : 'Updated from another tab.');
   });
 
-  window.addEventListener('hashchange', () => { route(location.hash); render(); });
+  window.addEventListener('hashchange', () => {
+    // A join link pasted into an already-open tab only changes the hash,
+    // which never re-runs module top-level code — catch it here.
+    const lateJoin = parseJoinHash(location.hash);
+    if (lateJoin) {
+      saveSyncConfig(lateJoin);
+      history.replaceState(null, '', location.pathname + '#/today');
+      location.reload();
+      return;
+    }
+    route(location.hash); render();
+  });
   window.addEventListener('beforeunload', () => store.flush());
 
   render();
