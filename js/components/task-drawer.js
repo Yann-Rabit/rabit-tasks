@@ -1,68 +1,67 @@
 /* ============================================================
    TaskDrawer — the task detail experience.
    ============================================================
-   A right-side drawer, never a centre modal. Opening a task must
-   not tear you out of the list you were reading: the list stays
-   rendered behind it and your scroll position and cursor survive.
+   A right-side drawer, never a centre modal. Everything
+   autosaves; there is no Save button.
 
-   Everything autosaves. There is no Save button, because there is
-   no state in which your edit is not yet real.
+   Listener discipline (the source of a real shipped bug): every
+   listener is attached exactly ONCE, when the dialog element is
+   created. render() only writes innerHTML. Re-attaching in
+   render() multiplies handlers on every re-render — after five
+   keystrokes a single click on Archive fired six times, which
+   with an even count reads as "the button does nothing".
    ============================================================ */
 
 import { $, $$, esc, icon, uid, ago, fmtDateLong, debounce } from '../util.js';
 import { STATUS, PRIORITY, PROJECT } from '../types.js';
 import { taskKey, memberOf, subProgress } from '../store.js';
-import { avatar, statusGlyph, priorityBars, dueChip } from './ui.js';
+import { avatar, statusGlyph, priorityBars } from './ui.js';
 import { statusPicker, priorityPicker, assigneePicker, projectPicker, duePicker, closeMenu } from './menu.js';
 import { confirmDialog, toast } from './feedback.js';
 
 let dlg = null;
 let currentId = null;
-/** @type {{store: any, onChange?: () => void, returnFocus?: () => void}|null} */
-let ctx = null;
+let ctx = null;          // { store, onChange, returnFocus }
+let closing = false;
 
 export const openTaskId = () => currentId;
 
 export function closeDrawer() {
-  if (!dlg?.open) return;
+  if (!dlg?.open || closing) return;
+  closing = true;
   closeMenu();
   dlg.classList.add('is-closing');
   const done = () => {
+    if (!closing) return;
+    closing = false;
     dlg.classList.remove('is-closing');
     dlg.close();
   };
-  // Respect reduced motion: the class animation collapses to 1ms there.
-  dlg.addEventListener('animationend', done, { once: true });
+  dlg.addEventListener('animationend', (e) => { if (e.target === dlg) done(); }, { once: true });
   setTimeout(done, 220);
 }
 
-export function openDrawer(taskId, { store, onChange, returnFocus }) {
-  ctx = { store, onChange, returnFocus };
+export function openDrawer(taskId, options = {}) {
+  ctx = options;
   currentId = taskId;
-
-  if (!dlg) {
-    dlg = document.createElement('dialog');
-    dlg.className = 'drawer';
-    dlg.setAttribute('aria-label', 'Task details');
-    document.body.appendChild(dlg);
-
-    dlg.addEventListener('close', () => {
-      currentId = null;
-      ctx?.returnFocus?.();
-      ctx = null;
-    });
-    // Clicking the backdrop closes; clicking inside must not.
-    dlg.addEventListener('click', (e) => { if (e.target === dlg) closeDrawer(); });
-    dlg.addEventListener('cancel', (e) => { e.preventDefault(); closeDrawer(); });
-  }
-
+  ensure();
   render();
   if (!dlg.open) dlg.showModal();
   $('.dr__title', dlg)?.focus({ preventScroll: true });
 }
 
+/**
+ * Re-render after an outside change (store event, remote sync).
+ * Skipped while the user is typing inside the drawer — replacing
+ * the DOM mid-word would eat the caret; the next outside change
+ * after typing stops will repaint.
+ */
 export function refreshDrawer() {
-  if (dlg?.open && currentId) render();
+  if (!dlg?.open || !currentId) return;
+  const active = document.activeElement;
+  if (active && dlg.contains(active) &&
+      (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return;
+  render();
 }
 
 /* ------------------------------------------------------------ */
@@ -71,11 +70,159 @@ function task() {
   return ctx?.store.state.tasks.find((t) => t.id === currentId) ?? null;
 }
 
+/** Save + repaint (structural edits: status, sub-task add, …). */
 function patch(p) {
+  if (!ctx || !currentId) return;
   ctx.store.updateTask(currentId, p);
   ctx.onChange?.();
   render();
 }
+
+/** Save without repainting — for text fields, so the caret stays put. */
+function patchQuiet(p) {
+  if (!ctx || !currentId) return;
+  ctx.store.updateTask(currentId, p);
+  ctx.onChange?.();
+}
+
+const saveTitle = debounce((v) => patchQuiet({ title: v }), 350);
+const saveDesc = debounce((v) => patchQuiet({ description: v }), 350);
+const saveBlocked = debounce((v) => patchQuiet({ blockedReason: v }), 350);
+const saveSub = debounce((id, v) => {
+  const t = task();
+  if (t) patchQuiet({ subtasks: t.subtasks.map((s) => (s.id === id ? { ...s, title: v } : s)) });
+}, 350);
+
+/* ------------------------------------------------------------
+   One-time creation: element + every listener.
+   ------------------------------------------------------------ */
+
+function ensure() {
+  if (dlg) return;
+  dlg = document.createElement('dialog');
+  dlg.className = 'drawer';
+  dlg.setAttribute('aria-label', 'Task details');
+  document.body.appendChild(dlg);
+
+  dlg.addEventListener('close', () => {
+    closing = false;
+    currentId = null;
+    ctx?.returnFocus?.();
+    ctx = null;
+  });
+  dlg.addEventListener('click', (e) => { if (e.target === dlg) closeDrawer(); });
+  dlg.addEventListener('cancel', (e) => { e.preventDefault(); closeDrawer(); });
+
+  dlg.addEventListener('input', (e) => {
+    const el = /** @type {HTMLElement} */ (e.target);
+    const d = el.dataset.d;
+    if (d === 'title') { autosize(el); saveTitle(el.value.trim()); }
+    if (d === 'description') saveDesc(el.value);
+    if (d === 'blocked') saveBlocked(el.value);
+    if (d === 'sub-text') saveSub(el.closest('[data-sub]').dataset.sub, el.value);
+  });
+
+  dlg.addEventListener('change', (e) => {
+    const el = /** @type {HTMLInputElement} */ (e.target);
+    if (el.dataset.d !== 'sub-toggle') return;
+    const id = el.closest('[data-sub]').dataset.sub;
+    const t = task();
+    if (t) patch({ subtasks: t.subtasks.map((s) => (s.id === id ? { ...s, done: el.checked } : s)) });
+  });
+
+  dlg.addEventListener('keydown', (e) => {
+    const d = /** @type {HTMLElement} */ (e.target).dataset?.d;
+    if (e.key !== 'Enter') return;
+    if (d === 'title') { e.preventDefault(); /** @type {HTMLElement} */ (e.target).blur(); }
+    if (d === 'comment') { e.preventDefault(); $('[data-d="comment-send"]', dlg)?.click(); }
+    if (d === 'sub-text') { e.preventDefault(); $('[data-d="sub-add"]', dlg)?.click(); }
+  });
+
+  dlg.addEventListener('click', onAction);
+}
+
+async function onAction(e) {
+  const btn = e.target.closest('[data-d]');
+  if (!btn || !ctx) return;
+  const d = btn.dataset.d;
+  const cur = task();
+  if (!cur && d !== 'close') return;
+
+  if (d === 'close') { closeDrawer(); return; }
+
+  if (d === 'copy') {
+    try {
+      await navigator.clipboard.writeText(taskKey(cur));
+      toast(`${taskKey(cur)} copied.`);
+    } catch {
+      toast('Could not reach the clipboard.', { tone: 'err' });
+    }
+    return;
+  }
+
+  if (d === 'pick-status')   { statusPicker(btn, cur.status, (v) => patch({ status: v })); return; }
+  if (d === 'pick-priority') { priorityPicker(btn, cur.priority, (v) => patch({ priority: v })); return; }
+  if (d === 'pick-assignee') { assigneePicker(btn, ctx.store.state, cur.assignee, (v) => patch({ assignee: v })); return; }
+  if (d === 'pick-project')  { projectPicker(btn, cur.project, (v) => patch({ project: v })); return; }
+  if (d === 'pick-due')      { duePicker(btn, cur.due, (v) => patch({ due: v })); return; }
+
+  if (d === 'sub-add') {
+    patch({ subtasks: [...(cur.subtasks || []), { id: uid('s'), title: '', done: false }] });
+    const inputs = $$('.sub__text', dlg);
+    inputs[inputs.length - 1]?.focus();
+    return;
+  }
+  if (d === 'sub-del') {
+    const id = btn.closest('[data-sub]').dataset.sub;
+    patch({ subtasks: cur.subtasks.filter((s) => s.id !== id) });
+    return;
+  }
+
+  if (d === 'comment-send') {
+    const input = $('[data-d="comment"]', dlg);
+    const body = input.value.trim();
+    if (!body) return;
+    ctx.store.addComment(currentId, body);
+    ctx.onChange?.();
+    render();
+    return;
+  }
+
+  if (d === 'archive') {
+    // Capture the store: ctx dies when the drawer closes, and the
+    // toast's Undo outlives it.
+    const store = ctx.store;
+    const id = currentId;
+    const wasArchived = cur.archived;
+    patch({ archived: !wasArchived });
+    if (!wasArchived) closeDrawer();
+    toast(wasArchived ? 'Task restored.' : 'Task archived.', {
+      action: { label: 'Undo', run: () => store.updateTask(id, { archived: wasArchived }) },
+    });
+    return;
+  }
+
+  if (d === 'delete') {
+    const ok = await confirmDialog({
+      title: `Delete ${taskKey(cur)}?`,
+      body: 'This removes the task and its comments. You can undo once from the toast.',
+      confirmLabel: 'Delete', danger: true,
+    });
+    if (!ok) return;
+    const store = ctx.store;
+    const snapshot = structuredClone(cur);
+    store.removeTask(currentId);
+    closeDrawer();
+    toast('Task deleted.', {
+      action: { label: 'Undo', run: () => store.restoreTask(snapshot) },
+      timeout: 8000,
+    });
+  }
+}
+
+/* ------------------------------------------------------------
+   Render — writes markup only. No listeners in here, ever.
+   ------------------------------------------------------------ */
 
 function render() {
   const t = task();
@@ -135,7 +282,6 @@ function render() {
             ${icon('folder', 'i--sm')}<span>${esc(PROJECT[t.project]?.label ?? 'No project')}</span>
           </button>
         </span>
-
       </div>
 
       ${t.status === 'blocked' ? `
@@ -162,8 +308,7 @@ function render() {
         <div class="subs" style="margin-top:8px">
           ${(t.subtasks || []).map((x) => `
             <div class="sub" data-sub="${esc(x.id)}">
-              <input type="checkbox" data-d="sub-toggle" ${x.done ? 'checked' : ''}
-                     aria-label="${esc(x.title)}">
+              <input type="checkbox" data-d="sub-toggle" ${x.done ? 'checked' : ''} aria-label="${esc(x.title)}">
               <input class="sub__text" data-d="sub-text" value="${esc(x.title)}" aria-label="Sub-task title">
               <button class="btn btn--ghost btn--icon btn--sm sub__del" data-d="sub-del"
                       aria-label="Remove sub-task">${icon('x', 'i--sm')}</button>
@@ -206,7 +351,6 @@ function render() {
     </div>`;
 
   autosize($('.dr__title', dlg));
-  wire();
 }
 
 function describe(a) {
@@ -221,104 +365,4 @@ function autosize(el) {
   if (!el) return;
   el.style.height = 'auto';
   el.style.height = `${el.scrollHeight}px`;
-}
-
-function wire() {
-  const t = task();
-
-  const saveTitle = debounce((v) => patchQuiet({ title: v }), 350);
-  const saveDesc = debounce((v) => patchQuiet({ description: v }), 350);
-  const saveBlocked = debounce((v) => patchQuiet({ blockedReason: v }), 350);
-
-  /** Save without a re-render, so the caret does not jump while typing. */
-  function patchQuiet(p) {
-    ctx.store.updateTask(currentId, p);
-    ctx.onChange?.();
-  }
-
-  dlg.addEventListener('input', (e) => {
-    const d = e.target.dataset.d;
-    if (d === 'title') { autosize(e.target); saveTitle(e.target.value.trim()); }
-    if (d === 'description') saveDesc(e.target.value);
-    if (d === 'blocked') saveBlocked(e.target.value);
-    if (d === 'sub-text') {
-      const id = e.target.closest('[data-sub]').dataset.sub;
-      patchQuiet({ subtasks: task().subtasks.map((s) => s.id === id ? { ...s, title: e.target.value } : s) });
-    }
-  });
-
-  dlg.addEventListener('change', (e) => {
-    if (e.target.dataset.d !== 'sub-toggle') return;
-    const id = e.target.closest('[data-sub]').dataset.sub;
-    patch({ subtasks: task().subtasks.map((s) => s.id === id ? { ...s, done: e.target.checked } : s) });
-  });
-
-  dlg.addEventListener('click', async (e) => {
-    const btn = e.target.closest('[data-d]');
-    if (!btn) return;
-    const d = btn.dataset.d;
-    const cur = task();
-
-    if (d === 'close') closeDrawer();
-    if (d === 'copy') {
-      navigator.clipboard?.writeText(taskKey(cur));
-      toast(`${taskKey(cur)} copied.`);
-    }
-    if (d === 'pick-status')   statusPicker(btn, cur.status, (v) => patch({ status: v }));
-    if (d === 'pick-priority') priorityPicker(btn, cur.priority, (v) => patch({ priority: v }));
-    if (d === 'pick-assignee') assigneePicker(btn, ctx.store.state, cur.assignee, (v) => patch({ assignee: v }));
-    if (d === 'pick-project')  projectPicker(btn, cur.project, (v) => patch({ project: v }));
-    if (d === 'pick-due')      duePicker(btn, cur.due, (v) => patch({ due: v }));
-
-    if (d === 'sub-add') {
-      patch({ subtasks: [...(cur.subtasks || []), { id: uid('s'), title: '', done: false }] });
-      const inputs = $$('.sub__text', dlg);
-      inputs[inputs.length - 1]?.focus();
-    }
-    if (d === 'sub-del') {
-      const id = btn.closest('[data-sub]').dataset.sub;
-      patch({ subtasks: cur.subtasks.filter((s) => s.id !== id) });
-    }
-
-    if (d === 'comment-send') {
-      const input = $('[data-d="comment"]', dlg);
-      const body = input.value.trim();
-      if (!body) return;
-      ctx.store.addComment(currentId, body);
-      ctx.onChange?.();
-      render();
-    }
-
-    if (d === 'archive') {
-      patch({ archived: !cur.archived });
-      toast(cur.archived ? 'Task restored.' : 'Task archived.', {
-        action: { label: 'Undo', run: () => { patch({ archived: cur.archived }); } },
-      });
-      if (!cur.archived) closeDrawer();
-    }
-
-    if (d === 'delete') {
-      const ok = await confirmDialog({
-        title: `Delete ${taskKey(cur)}?`,
-        body: 'This removes the task and its comments. You can undo this once from the toast.',
-        confirmLabel: 'Delete', danger: true,
-      });
-      if (!ok) return;
-      const snapshot = structuredClone(cur);
-      ctx.store.removeTask(currentId);
-      ctx.onChange?.();
-      closeDrawer();
-      toast('Task deleted.', {
-        action: { label: 'Undo', run: () => { ctx?.store.restoreTask(snapshot); ctx?.onChange?.(); } },
-        timeout: 8000,
-      });
-    }
-  });
-
-  dlg.addEventListener('keydown', (e) => {
-    // Enter in the title commits and leaves; it must never insert a newline.
-    if (e.key === 'Enter' && e.target.dataset.d === 'title') { e.preventDefault(); e.target.blur(); }
-    if (e.key === 'Enter' && e.target.dataset.d === 'comment') { e.preventDefault(); $('[data-d="comment-send"]', dlg).click(); }
-    if (e.key === 'Enter' && e.target.dataset.d === 'sub-text') { e.preventDefault(); $('[data-d="sub-add"]', dlg).click(); }
-  });
 }

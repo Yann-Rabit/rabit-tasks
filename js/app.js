@@ -344,7 +344,19 @@ function wireListDnd() {
 
 root.addEventListener('click', async (e) => {
   const el = e.target.closest('[data-act]');
-  if (!el) return;
+
+  // No explicit control hit: clicking a board card or a list row body
+  // opens the task. The title button is the a11y path; the whole
+  // surface is the pointer path.
+  if (!el) {
+    const target = /** @type {Element} */ (e.target);
+    if (target.closest('button, a, input, select, textarea, dialog')) return;
+    const card = target.closest('.card');
+    if (card?.dataset.id) { openTask(card.dataset.id); return; }
+    const row = target.closest('.row');
+    if (row?.dataset.id) { openTask(row.dataset.id); return; }
+    return;
+  }
   const act = el.dataset.act;
   const id = el.dataset.id;
 
